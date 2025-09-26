@@ -25,11 +25,21 @@ const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
 dirLight.position.set(100, 200, 100).normalize();
 scene.add(dirLight);
 
+const textureLoader = new THREE.TextureLoader();
+const texture = textureLoader.load('https://bricksafe.com/files/legobee/koenigseggagerar/brighter/001.JPG/640x360.JPG');
+
 // Load LEGO part
 const loader = new LDrawLoader();
 loader.setPartsLibraryPath('./LDraw/');
 loader.load('./LDraw/parts/3001.dat', function(group) {
     console.log("LEGO part loaded successfully");
+    group.traverse(child => {
+        if (child.isMesh) {
+            child.material = new THREE.MeshStandardMaterial({
+                map: texture
+            });
+        }
+    });
     group.rotation.x = Math.PI;
     scene.add(group);
 }, undefined, function(error) {
