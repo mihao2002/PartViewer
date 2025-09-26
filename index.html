@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>LDraw Brick Viewer</title>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    #viewer { width: 100vw; height: 100vh; }
+  </style>
+</head>
+<body>
+  <div id="viewer"></div>
+
+  <!-- Three.js -->
+  <script src="https://unpkg.com/three@0.167.0/build/three.min.js"></script>
+  <script src="https://unpkg.com/three@0.167.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://unpkg.com/three@0.167.0/examples/js/loaders/LDrawLoader.js"></script>
+
+  <script>
+    const container = document.getElementById("viewer");
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xf0f0f0);
+
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 10000);
+    camera.position.set(200, 200, 200);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    container.appendChild(renderer.domElement);
+
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+
+    // Lights
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1.2);
+    hemiLight.position.set(0, 200, 0);
+    scene.add(hemiLight);
+
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    dirLight.position.set(200, 200, 100).normalize();
+    scene.add(dirLight);
+
+    // Load LDraw part from remote URL
+    const loader = new THREE.LDrawLoader();
+    loader.setPartsLibraryPath("https://library.ldraw.org/library/official/parts/");
+    loader.load("3001.dat", function(group) {
+      group.rotation.x = Math.PI; // correct orientation
+      scene.add(group);
+    });
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    window.addEventL
