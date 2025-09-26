@@ -27,11 +27,11 @@ scene.add(dirLight);
 
 // Load LEGO part
 const loader = new LDrawLoader();
-loader.setPartsLibraryPath('https://library.ldraw.org/library/official/parts/');
-loader.path = 'https://library.ldraw.org/library/official/parts/';
+loader.setPartsLibraryPath('./LDraw/');
+loader.path = './LDraw/';
 loader.load('3001.dat', function(group) {
     console.log("LEGO part loaded successfully");
-    group.rotation.x = Math.PI; // correct orientation
+    group.rotation.x = Math.PI;
     scene.add(group);
 }, undefined, function(error) {
     console.error('Error loading part:', error);
