@@ -31,7 +31,6 @@
 
     const controls = new THREE.OrbitControls(camera, renderer.domElement);
 
-    // Lights
     const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1.2);
     hemiLight.position.set(0, 200, 0);
     scene.add(hemiLight);
@@ -40,12 +39,13 @@
     dirLight.position.set(200, 200, 100).normalize();
     scene.add(dirLight);
 
-    // Load LDraw part from remote URL
     const loader = new THREE.LDrawLoader();
-    loader.setPartsLibraryPath("https://library.ldraw.org/library/official/parts/");
-    loader.load("3001.dat", function(group) {
+    loader.setPartsLibraryPath('https://library.ldraw.org/library/official/parts/');
+    loader.load('3001.dat', function(group) {
       group.rotation.x = Math.PI; // correct orientation
       scene.add(group);
+    }, undefined, function(error) {
+      console.error('Error loading part:', error);
     });
 
     function animate() {
@@ -55,4 +55,11 @@
     }
     animate();
 
-    window.addEventL
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>
