@@ -53,15 +53,19 @@
     dirLight.position.set(200, 200, 100).normalize();
     scene.add(dirLight);
 
-    const loader = new THREE.LDrawLoader();
-    loader.setPartsLibraryPath('https://library.ldraw.org/library/official/parts/');
-    loader.load('3001.dat', function(group) {
-      console.log("Loaded 3001.dat successfully");
-      group.rotation.x = Math.PI; // correct orientation
-      scene.add(group);
-    }, undefined, function(error) {
-      console.error('Error loading part:', error);
-    });
+    // const loader = new THREE.LDrawLoader();
+    // loader.setPartsLibraryPath('https://library.ldraw.org/library/official/parts/');
+    // loader.load('3001.dat', function(group) {
+    //   console.log("Loaded 3001.dat successfully");
+    //   group.rotation.x = Math.PI; // correct orientation
+    //   scene.add(group);
+    // }, undefined, function(error) {
+    //   console.error('Error loading part:', error);
+    // });
+    const geometry = new THREE.BoxGeometry(50, 50, 50);
+    const material = new THREE.MeshStandardMaterial({ color: 0xff0000 });
+    const cube = new THREE.Mesh(geometry, material);
+    scene.add(cube);
 
     function animate() {
       requestAnimationFrame(animate);
