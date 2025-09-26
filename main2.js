@@ -56,3 +56,24 @@ window.addEventListener("resize", () => {
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
 });
+
+// Handle texture upload
+document.getElementById('textureInput').addEventListener('change', function(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const textureLoader = new THREE.TextureLoader();
+        const texture = textureLoader.load(e.target.result);
+
+        if (partGroup) {
+            partGroup.traverse(child => {
+                if (child.isMesh) {
+                    child.material = new THREE.MeshStandardMaterial({ map: texture });
+                }
+            });
+        }
+    };
+    reader.readAsDataURL(file);
+});
