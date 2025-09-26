@@ -27,7 +27,7 @@ scene.add(dirLight);
 
 // Load LEGO part
 const loader = new LDrawLoader();
-loader.setPartsLibraryPath('./LDraw');
+loader.setPartsLibraryPath('./LDraw/');
 loader.load('./LDraw/parts/3001.dat', function(group) {
     console.log("LEGO part loaded successfully");
     group.rotation.x = Math.PI;
