@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { LDrawLoader } from 'three/examples/jsm/loaders/LDrawLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { LDrawLoader } from 'three/addons/loaders/LDrawLoader.js';
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xf0f0f0);
