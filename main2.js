@@ -34,7 +34,7 @@ const loader = new LDrawLoader();
 loader.setPartsLibraryPath('./LDraw/');
 loader.load('./LDraw/parts/3001.dat', function(group) {
     console.log("LEGO part loaded successfully");
-    // group.rotation.x = Math.PI;
+    group.rotation.x = Math.PI;
 
     const geometries = [];
     group.traverse(child => {
@@ -55,7 +55,7 @@ loader.load('./LDraw/parts/3001.dat', function(group) {
         })
     );
 
-    // mergedMesh.rotation.x = Math.PI;
+    mergedMesh.rotation.x = Math.PI;
 
     partGroup = mergedMesh;
     scene.add(mergedMesh);
@@ -63,21 +63,6 @@ loader.load('./LDraw/parts/3001.dat', function(group) {
     // mark exterior faces
     //markExteriorFaces(mergedMesh);
     assignUVsAndGenerateTemplate(mergedMesh);
-
-    // create toggle button
-    const markBtn = document.createElement("button");
-    markBtn.textContent = "Toggle Exterior Mark";
-    document.body.appendChild(markBtn);
-
-    let marked = false;
-    markBtn.addEventListener("click", () => {
-        if (!marked) {
-            mergedMesh.material = createExteriorMarkMaterial();
-        } else {
-            mergedMesh.material = new THREE.MeshStandardMaterial({ color: 0xffffff });
-        }
-        marked = !marked;
-    });
 }, undefined, function(error) {
     console.error('Error loading part:', error);
 });
@@ -89,26 +74,12 @@ function assignUVsAndGenerateTemplate(mesh, scale = 50) {
     const H = box.max.y - box.min.y; // height (Y)
     const W = box.max.z - box.min.z; // width (Z)
 
-    // Texture dimensions
     const texW = 2 * (L + W);
     const texH = 2 * W + H;
 
     const pos = mesh.geometry.attributes.position;
     const uv = new Float32Array(pos.count * 2);
 
-    const setFaceUV = (i0, i1, i2, mapper) => {
-        const v0 = new THREE.Vector3(pos.getX(i0), pos.getY(i0), pos.getZ(i0));
-        const v1 = new THREE.Vector3(pos.getX(i1), pos.getY(i1), pos.getZ(i1));
-        const v2 = new THREE.Vector3(pos.getX(i2), pos.getY(i2), pos.getZ(i2));
-
-        [v0, v1, v2].forEach((v, j) => {
-            const uvCoords = mapper(v);
-            uv[(i0 + j) * 2] = uvCoords.x / texW;
-            uv[(i0 + j) * 2 + 1] = uvCoords.y / texH;
-        });
-    };
-
-    // Precompute rectangle bounds
     const regions = {
         top:    { x: W,       y: 0,     w: L, h: W },
         left:   { x: 0,       y: W,     w: W, h: H },
@@ -118,7 +89,6 @@ function assignUVsAndGenerateTemplate(mesh, scale = 50) {
         bottom: { x: W,       y: W + H, w: L, h: W }
     };
 
-    // Mappers for each view
     const mappers = {
         top:    v => new THREE.Vector2(regions.top.x + (v.x - box.min.x), regions.top.y + (W - (v.z - box.min.z))),
         bottom: v => new THREE.Vector2(regions.bottom.x + (v.x - box.min.x), regions.bottom.y + (v.z - box.min.z)),
@@ -128,40 +98,69 @@ function assignUVsAndGenerateTemplate(mesh, scale = 50) {
         right:  v => new THREE.Vector2(regions.right.x + (W - (v.z - box.min.z)), regions.right.y + (H - (v.y - box.min.y)))
     };
 
-    // Loop faces
+    const referencePoints = {
+        top:    v => new THREE.Vector3(v.x, box.max.y + 1, v.z),
+        bottom: v => new THREE.Vector3(v.x, box.min.y - 1, v.z),
+        front:  v => new THREE.Vector3(v.x, v.y, box.min.z - 1),
+        back:   v => new THREE.Vector3(v.x, v.y, box.max.z + 1),
+        left:   v => new THREE.Vector3(box.min.x - 1, v.y, v.z),
+        right:  v => new THREE.Vector3(box.max.x + 1, v.y, v.z)
+    };
+
+    const raycaster = new THREE.Raycaster();
+
     for (let i = 0; i < pos.count; i += 3) {
         const v0 = new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i));
-        const v1 = new THREE.Vector3(pos.getX(i+1), pos.getY(i+1), pos.getZ(i+1));
-        const v2 = new THREE.Vector3(pos.getX(i+2), pos.getY(i+2), pos.getZ(i+2));
+        const v1 = new THREE.Vector3(pos.getX(i + 1), pos.getY(i + 1), pos.getZ(i + 1));
+        const v2 = new THREE.Vector3(pos.getX(i + 2), pos.getY(i + 2), pos.getZ(i + 2));
 
-        const centroid = new THREE.Vector3().addVectors(v0, v1).add(v2).divideScalar(3);
-
-        // Choose projection by dominant axis of normal
         const normal = new THREE.Vector3().crossVectors(
             new THREE.Vector3().subVectors(v1, v0),
             new THREE.Vector3().subVectors(v2, v0)
         ).normalize();
 
-        let mapper;
+        let mapper, view;
         if (Math.abs(normal.y) > Math.abs(normal.x) && Math.abs(normal.y) > Math.abs(normal.z)) {
             mapper = normal.y > 0 ? mappers.top : mappers.bottom;
+            view = normal.y > 0 ? "top" : "bottom";
         } else if (Math.abs(normal.z) > Math.abs(normal.x)) {
             mapper = normal.z > 0 ? mappers.back : mappers.front;
+            view = normal.z > 0 ? "back" : "front";
         } else {
             mapper = normal.x > 0 ? mappers.right : mappers.left;
+            view = normal.x > 0 ? "right" : "left";
         }
 
-        [v0, v1, v2].forEach((v, j) => {
+        // Raycast for each vertex to detect exterior
+        const vertices = [v0, v1, v2];
+        let isExterior = false;
+        for (let v of vertices) {
+            const refPoint = referencePoints[view](v);
+            const dir = new THREE.Vector3().subVectors(v, refPoint).normalize();
+            raycaster.set(refPoint, dir);
+            const intersects = raycaster.intersectObject(mesh, true);
+            if (intersects.length &&
+                Math.abs(intersects[0].point.distanceTo(refPoint) - v.distanceTo(refPoint)) < 0.001) {
+                isExterior = true;
+                break;
+            }
+        }
+
+        if (!isExterior) {
+            uv.set([0, 0, 0, 0, 0, 0], i * 2);
+            continue;
+        }
+
+        vertices.forEach((v, j) => {
             const uvCoords = mapper(v);
             const idx = i + j;
-            uv[idx * 2]     = uvCoords.x / texW;
-            uv[idx * 2 + 1] = 1 - uvCoords.y / texH; // flip Y for texture space
+            uv[idx * 2] = uvCoords.x / texW;
+            uv[idx * 2 + 1] = 1 - uvCoords.y / texH;
         });
     }
 
     mesh.geometry.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
 
-    // === Reference Template Image ===
     const canvas = document.createElement("canvas");
     canvas.width = texW * scale;
     canvas.height = texH * scale;
@@ -170,24 +169,17 @@ function assignUVsAndGenerateTemplate(mesh, scale = 50) {
     ctx.fillStyle = "#fff";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    ctx.strokeStyle = "#000";
-    ctx.lineWidth = 2;
-
-    // Object.entries(regions).forEach(([name, r]) => {
-    //     ctx.strokeRect(r.x * scale, r.y * scale, r.w * scale, r.h * scale);
-    //     ctx.fillStyle = "black";
-    //     ctx.font = `${16}px Arial`;
-    //     ctx.fillText(name, (r.x + 0.2) * scale, (r.y + 0.5) * scale);
-    // });
-
-    // === Draw projected faces onto template ===
-    ctx.strokeStyle = "#00AAFF"; // light blue for triangles
+    ctx.strokeStyle = "#00AAFF";
     ctx.lineWidth = 1;
 
     for (let i = 0; i < pos.count; i += 3) {
         const uv0 = new THREE.Vector2(uv[i * 2] * texW, uv[i * 2 + 1] * texH);
         const uv1 = new THREE.Vector2(uv[(i + 1) * 2] * texW, uv[(i + 1) * 2 + 1] * texH);
         const uv2 = new THREE.Vector2(uv[(i + 2) * 2] * texW, uv[(i + 2) * 2 + 1] * texH);
+
+        if (uv0.equals(new THREE.Vector2(0, 0)) &&
+            uv1.equals(new THREE.Vector2(0, 0)) &&
+            uv2.equals(new THREE.Vector2(0, 0))) continue;
 
         ctx.beginPath();
         ctx.moveTo(uv0.x * scale, uv0.y * scale);
@@ -198,42 +190,6 @@ function assignUVsAndGenerateTemplate(mesh, scale = 50) {
     }
 
     uvMapDataURL = canvas.toDataURL("image/png");
-}
-
-
-function addReferencePointMarker(scene, point) {
-    const sphereGeom = new THREE.SphereGeometry(2, 16, 16);
-    const sphereMat = new THREE.MeshBasicMaterial({ color: 0x0000ff });
-    const sphere = new THREE.Mesh(sphereGeom, sphereMat);
-    sphere.position.copy(point);
-    scene.add(sphere);
-}
-
-function createExteriorMarkMaterial() {
-    return new THREE.ShaderMaterial({
-        vertexShader: `
-            attribute float exteriorFace;
-            varying float vExterior;
-            varying vec2 vUv;
-            void main() {
-                vUv = uv;
-                vExterior = exteriorFace;
-                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-            }
-        `,
-        fragmentShader: `
-            varying float vExterior;
-            varying vec2 vUv;
-            void main() {
-                if (vExterior > 0.5) {
-                    gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0); // red exterior
-                } else {
-                    gl_FragColor = vec4(0.8, 0.8, 0.8, 1.0); // grey interior
-                }
-            }
-        `,
-        side: THREE.DoubleSide
-    });
 }
 
 function animate() {
